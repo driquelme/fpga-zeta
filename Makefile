@@ -10,4 +10,4 @@ regress:
 	uv run pytest
 
 tables:
-	@echo "coefficient/ROM generation lands in M4 (tools/coeffgen, tools/romgen)"
+	uv run python scripts/gen_tables.py

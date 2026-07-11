@@ -1,2 +1,18 @@
 // Portable RTL (rtl/common) — paths relative to repo root.
 rtl/common/prim/skid_buffer.sv
+rtl/common/prim/lzc.sv
+rtl/common/mp/limb_addsub.sv
+rtl/common/mp/limb_shift.sv
+rtl/common/mp/limb_mul.sv
+rtl/common/mp/limb_mul_ks.sv
+rtl/common/pkg/mp_pkg.sv
+rtl/common/mp/mpf_mul.sv
+rtl/common/mp/mpf_add.sv
+rtl/common/fx/fx_mul_mod1.sv
+rtl/common/fn/sincos_turns.sv
+rtl/common/fn/exp_mpf.sv
+rtl/common/fn/log_mpf.sv
+rtl/common/fn/cexp_turns.sv
+rtl/common/zeta/npow_s_kernel.sv
+rtl/common/zeta/euler_maclaurin_top.sv
+rtl/common/engine/zeta_engine.sv

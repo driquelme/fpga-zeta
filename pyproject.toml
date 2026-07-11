@@ -29,6 +29,7 @@ packages = ["host/zetafpga"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "tb"]
+pythonpath = ["tb"]
 addopts = "-q"
 markers = [
     "nightly: slow wide-config regressions, excluded from the default run",

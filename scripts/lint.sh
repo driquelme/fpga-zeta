@@ -4,7 +4,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "== verilator --lint-only =="
-verilator --lint-only -Wall -f rtl/filelists/generic-sim.f
+# -Wno-MULTITOP: the filelist is a library of independent blocks, many tops by design.
+verilator --lint-only -Wall -Wno-MULTITOP -f rtl/filelists/generic-sim.f
 
 if command -v verible-verilog-lint >/dev/null 2>&1; then
     echo "== verible-verilog-lint =="
