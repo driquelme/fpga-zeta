@@ -1,0 +1,56 @@
+[project]
+name = "zetafpga"
+version = "0.0.1"
+description = "Host stack, golden models, and verification for fpga-zeta"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = [
+    "cocotb>=1.9",
+    "mpmath>=1.3",
+]
+
+[project.optional-dependencies]
+arb = ["python-flint>=0.6"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["host/zetafpga"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "tb"]
+addopts = "-q"
+markers = [
+    "nightly: slow wide-config regressions, excluded from the default run",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+include = ["host/**/*.py", "tb/**/*.py", "tests/**/*.py", "tools/**/*.py", "scripts/**/*.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["zetafpga"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["host", "tests"]
+mypy_path = "host"
+
+[[tool.mypy.overrides]]
+module = ["cocotb.*", "cocotb_tools.*", "mpmath.*", "flint.*"]
+ignore_missing_imports = true
