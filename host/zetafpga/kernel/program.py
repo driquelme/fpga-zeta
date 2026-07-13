@@ -43,6 +43,24 @@ class Program:
         self._expected_evals += 1
         return self.raw(isa.pack_compute_em(prog))
 
+    def write_rs_table(self, entries: list[tuple[int, mf.MPF]]) -> "Program":
+        self.raw(isa.descriptor(isa.Op.WRITE_TABLE, table_id=isa.TBL_RS, count=len(entries)))
+        for lnn2pi, amp in entries:
+            self.raw(isa.pack_rs_entry(lnn2pi, amp, self.fmt))
+        return self
+
+    def compute_rs(self, t_fx: int, n: int) -> "Program":
+        self._expected_evals += 1
+        return self.raw(isa.pack_compute_rs(t_fx, n))
+
+    def compute_z(self, t_fx: int) -> "Program":
+        self._expected_evals += 1
+        return self.raw(isa.pack_compute_z(t_fx))
+
+    def compute_zgrid(self, t0_fx: int, dt_fx: int, count: int) -> "Program":
+        self._expected_evals += count
+        return self.raw(isa.pack_compute_zgrid(t0_fx, dt_fx, count))
+
     def readback(self) -> "Program":
         return self.raw(isa.descriptor(isa.Op.READBACK))
 

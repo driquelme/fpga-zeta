@@ -60,11 +60,22 @@ module limb_mul #(
     end
   end
 
+  // Ceil-halving reduction: level l holds ceil(NPP/2^l) terms. When the
+  // previous level is odd, its last element passes through registered (a
+  // plain NPP>>l tree silently DROPS it for non-power-of-2 NT — caught at
+  // LIMBS=3 by the theta unit's 192-bit internal format).
   for (genvar gl = 1; gl <= int'(TREE_LEVELS); gl++) begin : gen_level
-    localparam int unsigned CNT = NPP >> gl;
-    for (genvar gk = 0; gk < int'(CNT); gk++) begin : gen_pair
+    localparam int unsigned CNT_PREV = (NPP + (1 << (gl - 1)) - 1) >> (gl - 1);
+    localparam int unsigned CNT = (NPP + (1 << gl) - 1) >> gl;
+    localparam int unsigned PAIRS = CNT_PREV / 2;
+    for (genvar gk = 0; gk < int'(PAIRS); gk++) begin : gen_pair
       always_ff @(posedge clk) begin
         lvl[gl][gk] <= lvl[gl-1][2*gk] + lvl[gl-1][2*gk+1];
+      end
+    end
+    if (CNT_PREV % 2 == 1) begin : gen_odd
+      always_ff @(posedge clk) begin
+        lvl[gl][CNT-1] <= lvl[gl-1][CNT_PREV-1];
       end
     end
     for (genvar gk = int'(CNT); gk < int'(NPP); gk++) begin : gen_tie

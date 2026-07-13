@@ -12,7 +12,7 @@ harness and PCIe backends slot in behind the same interface in Phase 2.
 """
 
 from zetafpga.golden import mpfloat as mf
-from zetafpga.golden import zeta_em
+from zetafpga.golden import rs_pipe, rs_z, zeta_em
 from zetafpga.kernel import isa
 from zetafpga.kernel.em_setup import EmProgram
 from zetafpga.kernel.program import Program
@@ -23,6 +23,7 @@ class GoldenBackend:
         self.fmt = fmt
         self._lnn: list[tuple[int, int]] = []
         self._bern: list[mf.MPF] = []
+        self._rs: list[tuple[int, mf.MPF]] = []
         self._results: list[isa.EmResult] = []
         self._ovf = False
         self._unf = False
@@ -81,6 +82,17 @@ class GoldenBackend:
                     for _ in range(count):
                         v = join(take(ew))
                         self._lnn.append((v & ((1 << lnw) - 1), v >> lnw))
+                elif table_id == isa.TBL_RS:
+                    bw = fmt.width + 64
+                    self._rs = []
+                    for _ in range(count):
+                        v = join(take(isa.rs_entry_words(fmt)))
+                        self._rs.append(
+                            (
+                                v & ((1 << (bw + 8)) - 1),
+                                mf.unpack((v >> (bw + 8)) & ((1 << fmt.mpw) - 1), fmt),
+                            )
+                        )
                 else:
                     self._bern = [
                         mf.unpack(join(take(k)) & ((1 << fmt.mpw) - 1), fmt) for _ in range(count)
@@ -108,6 +120,27 @@ class GoldenBackend:
                 self._results.append(isa.EmResult(mf.pack(re, fmt), mf.pack(im, fmt), ovf, unf))
                 self._ovf |= ovf
                 self._unf |= unf
+            elif op == isa.Op.COMPUTE_RS:
+                t_fx = take(1)[0]
+                re, im = rs_pipe.rs_power_sum(
+                    t_fx, self._rs[:count], fmt, fmt.width + 32, fmt.width + 64
+                )
+                self._results.append(isa.EmResult(mf.pack(re, fmt), mf.pack(im, fmt), False, False))
+            elif op in (isa.Op.COMPUTE_Z, isa.Op.COMPUTE_ZGRID):
+                if op == isa.Op.COMPUTE_ZGRID:
+                    t0_fx, dt_fx, points = take(1)[0], take(1)[0], count
+                else:
+                    t0_fx, dt_fx, points = take(1)[0], 0, 1
+                for j in range(points):
+                    t_fx = (t0_fx + j * dt_fx) & ((1 << 64) - 1)
+                    prep = rs_z.z_prep(t_fx, fmt)  # N derived on chip
+                    re, im = rs_pipe.rs_power_sum(
+                        t_fx, self._rs[: prep.n], fmt, fmt.width + 32, fmt.width + 64
+                    )
+                    z = rs_z.z_post(prep, re, im, fmt)
+                    self._results.append(
+                        isa.EmResult(mf.pack(z, fmt), mf.pack(mf.zero(0), fmt), False, False)
+                    )
             elif op == isa.Op.READBACK:
                 out = [
                     (len(self._results) & 0xFFFFFF)

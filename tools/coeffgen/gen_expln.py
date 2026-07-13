@@ -20,7 +20,7 @@ from pathlib import Path
 
 import mpmath as mp
 
-WIDTHS = [64, 128, 256]
+WIDTHS = [64, 128, 192, 256, 320]  # 192/320 serve theta's W+64 internal log
 
 
 def _terms(fg: int) -> int:

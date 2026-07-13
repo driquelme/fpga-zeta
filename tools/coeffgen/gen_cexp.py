@@ -20,7 +20,7 @@ from pathlib import Path
 
 import mpmath as mp
 
-WIDTHS = [64, 128, 256]
+WIDTHS = [64, 128, 192, 256]  # 192: LIMBS=3 coverage configs
 SEGW = 10
 
 

@@ -41,10 +41,18 @@ class Op(IntEnum):
     READBACK = 4
     BARRIER = 5
     COMPUTE_PS = 6  # power sum only (Riemann-Siegel main sum); same payload as COMPUTE_EM
+    COMPUTE_RS = 7  # pipelined RS main sum from the RS table; payload: t_fx (1 word)
+    COMPUTE_Z = 8  # fully on-chip Z(t); payload: t_fx (1 word); count ignored
+    COMPUTE_ZGRID = 9  # count = J grid points; payload: t0_fx, dt_fx (2 words)
+    # COMPUTE_Z/ZGRID: results = (Z, packed zero) per point. 1/t (mpf_recip,
+    # M16) and N = floor(sqrt(t/2pi)) (M18) are derived on chip; the host only
+    # sizes the RS table (>= floor(sqrt(t_max/2pi)) + 1 entries) and respects
+    # the t >= t_min validity floor (theta_w*.json).
 
 
 TBL_LNN = 0
 TBL_BERN = 1
+TBL_RS = 2  # pipelined-RS entries: {amp MPF, lnn2pi Q8.BW}
 
 
 def mpf_words(fmt: mf.Format) -> int:
@@ -56,6 +64,28 @@ def entry_words(fmt: mf.Format) -> int:
     bw = phw + 32
     lnw = fmt.width + 24 + 8
     return (lnw + bw + 8 + 63) // 64
+
+
+def rs_entry_words(fmt: mf.Format) -> int:
+    bw = fmt.width + 64
+    return (bw + 8 + fmt.mpw + 63) // 64
+
+
+def pack_rs_entry(lnn2pi: int, amp: mf.MPF, fmt: mf.Format) -> list[int]:
+    bw = fmt.width + 64
+    return _split(lnn2pi | (mf.pack(amp, fmt) << (bw + 8)), rs_entry_words(fmt))
+
+
+def pack_compute_rs(t_fx: int, n: int) -> list[int]:
+    return [*descriptor(Op.COMPUTE_RS, count=n), t_fx]
+
+
+def pack_compute_z(t_fx: int) -> list[int]:
+    return [*descriptor(Op.COMPUTE_Z), t_fx]
+
+
+def pack_compute_zgrid(t0_fx: int, dt_fx: int, count: int) -> list[int]:
+    return [*descriptor(Op.COMPUTE_ZGRID, count=count), t0_fx, dt_fx]
 
 
 def _split(value: int, words: int) -> list[int]:

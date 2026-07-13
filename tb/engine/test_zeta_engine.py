@@ -153,9 +153,15 @@ async def malformed_then_recover(dut) -> None:
 def test_zeta_engine() -> None:
     from common.runner import run_block
 
+    from zetafpga.golden import rs_z, theta
+
     fmt = FMT
     ecfg = ECFG
     ccfg = CCFG
+    tcfg = theta.load_cfg(fmt.width)
+    rcfg = rs_z.load_cfg(fmt.width)
+    ecfg2 = expln.load_cfg(tcfg.w2)
+    tables = expln.TABLES_DIR
     run_block(
         [
             "rtl/common/prim/lzc.sv",
@@ -166,11 +172,18 @@ def test_zeta_engine() -> None:
             "rtl/common/mp/limb_addsub.sv",
             "rtl/common/mp/mpf_mul.sv",
             "rtl/common/mp/mpf_add.sv",
+            "rtl/common/mp/mpf_recip.sv",
             "rtl/common/fx/fx_mul_mod1.sv",
             "rtl/common/fn/exp_mpf.sv",
+            "rtl/common/fn/log_mpf.sv",
             "rtl/common/fn/cexp_turns.sv",
             "rtl/common/zeta/npow_s_kernel.sv",
             "rtl/common/zeta/euler_maclaurin_top.sv",
+            "rtl/common/fn/cexp_pipe.sv",
+            "rtl/common/zeta/rs_power_sum.sv",
+            "rtl/common/zeta/rs_power_sum_tiled.sv",
+            "rtl/common/fn/theta_turns.sv",
+            "rtl/common/zeta/rs_z_unit.sv",
             "rtl/common/engine/zeta_engine.sv",
         ],
         "zeta_engine",
@@ -182,7 +195,16 @@ def test_zeta_engine() -> None:
             "CONSTW": ecfg.constw,
             "TERMS": ecfg.terms,
             "CTERMS": ccfg.terms,
-            "EXP_ROM": f'"{expln.TABLES_DIR / (ecfg.stem + "_exp.mem")}"',
-            "CEXP_ROM": f'"{cexp.TABLES_DIR / (ccfg.stem + ".mem")}"',
+            "EXP_ROM": f'"{tables / (ecfg.stem + "_exp.mem")}"',
+            "CEXP_ROM": f'"{tables / (ccfg.stem + ".mem")}"',
+            "KTERMS": tcfg.k,
+            "LOG_TERMS": ecfg2.terms,
+            "THETA_FX_ROM": f'"{tables / (tcfg.stem + "_fx.mem")}"',
+            "THETA_MPF_ROM": f'"{tables / (tcfg.stem + "_mpf.mem")}"',
+            "EXP_ROM2": f'"{tables / (ecfg2.stem + "_exp.mem")}"',
+            "LN_ROM2": f'"{tables / (ecfg2.stem + "_ln.mem")}"',
+            "NC": rcfg.nc,
+            "KMAX": rcfg.kmax,
+            "RSCK_ROM": f'"{tables / (rcfg.stem + ".mem")}"',
         },
     )

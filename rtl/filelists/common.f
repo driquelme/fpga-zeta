@@ -16,3 +16,10 @@ rtl/common/fn/cexp_turns.sv
 rtl/common/zeta/npow_s_kernel.sv
 rtl/common/zeta/euler_maclaurin_top.sv
 rtl/common/engine/zeta_engine.sv
+rtl/common/fn/cexp_pipe.sv
+rtl/common/zeta/rs_power_sum.sv
+rtl/common/fn/theta_turns.sv
+rtl/common/zeta/rs_z_unit.sv
+rtl/common/mp/mpf_recip.sv
+rtl/common/zeta/rs_power_sum_tiled.sv
+rtl/common/fn/fft_radix2.sv
