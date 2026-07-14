@@ -266,7 +266,7 @@ module rs_acc_norm #(
     automatic int p = int'(ACCW) - 1 - int'(32'(lz));
     e_norm = 24'(p - int'(FRAC) + 1);
     if (p >= int'(WIDTH)) begin
-      t_norm = (WIDTH+2)'(mag >> unsigned'(p - int'(WIDTH)));
+      t_norm = (WIDTH+2)'(((ACCW + WIDTH + 2)'(mag)) >> unsigned'(p - int'(WIDTH)));
     end else begin
       t_norm = (WIDTH+2)'(mag) << unsigned'(int'(WIDTH) - p);
     end

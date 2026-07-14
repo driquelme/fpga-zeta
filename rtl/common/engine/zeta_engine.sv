@@ -42,6 +42,9 @@ module zeta_engine #(
     parameter int unsigned RES_DEPTH = 128,
     parameter int unsigned RS_DEPTH = 1024,
     parameter int unsigned RS_LANES = 1,  // power of 2; RS table is banked by entry index
+    parameter int unsigned OS_M = 128,    // COMPUTE_OS FFT size (J <= OS_M/4)
+    parameter string FFT_ROM = "fft_m128.mem",
+    parameter string OS_ROM = "fft_os.mem",
     localparam int unsigned WIDTH = LIMBS * LIMBW,
     localparam int unsigned MPW = WIDTH + EXPW + 3,
     localparam int unsigned BW = PHW + 32,
@@ -76,6 +79,7 @@ module zeta_engine #(
   localparam logic [7:0] OP_COMPUTE_RS = 8'd7;  // pipelined RS main sum
   localparam logic [7:0] OP_COMPUTE_Z = 8'd8;      // fully on-chip Z(t), count ignored
   localparam logic [7:0] OP_COMPUTE_ZGRID = 8'd9;  // J = count points from (t0, dt)
+  localparam logic [7:0] OP_COMPUTE_OS = 8'd10;    // binned-FFT grid main sum
 
   // packed MPF zero (is_zero flag set) for the Z result's imaginary word
   localparam logic [MPW-1:0] ZERO_MPF = MPW'(1) << (WIDTH + EXPW + 1);
@@ -171,6 +175,31 @@ module zeta_engine #(
   logic [23:0] zp_n;
   logic [MPW-1:0] zp_z;
 
+  // ---- O-S grid unit (COMPUTE_OS) --------------------------------------------------
+  logic os_start, os_ready, os_pv, os_done_w, os_feed;
+  logic [MPW-1:0] os_sre, os_sim;
+  logic os_entry_ready;
+  logic [23:0] os_ctr, os_n_q;
+  logic [RSW-1:0] os_cur;
+
+  assign os_cur = rs_ram[32'(os_ctr)%RS_LANES][32'(os_ctr)/RS_LANES];
+
+  os_grid_sum #(
+      .LIMBS(LIMBS), .EXPW(EXPW), .LIMBW(LIMBW), .PHW(PHW), .FG(FG),
+      .CONSTW(CONSTW), .SEGW(SEGW), .CTERMS(CTERMS), .EXP_TERMS(TERMS),
+      .TW(TW), .TILE_LATENCY(TILE_LATENCY),
+      .CEXP_ROM(CEXP_ROM), .EXP_ROM(EXP_ROM),
+      .M(OS_M), .FFT_ROM(FFT_ROM), .OS_ROM(OS_ROM)
+  ) u_os (
+      .clk(clk), .rst_n(rst_n),
+      .start_valid(os_start), .start_ready(os_ready),
+      .t0_fx(t_cur), .dt_fx(dt_q), .n_in(os_n_q), .j_in(n_q),
+      .entry_valid(os_feed), .entry_ready(os_entry_ready),
+      .lnn2pi(os_cur[BW+7:0]), .amp(os_cur[BW+8+:MPW]),
+      .point_valid(os_pv), .s_re(os_sre), .s_im(os_sim),
+      .done(os_done_w)
+  );
+
   rs_z_unit #(
       .LIMBS(LIMBS), .EXPW(EXPW), .LIMBW(LIMBW), .TW(TW),
       .TILE_LATENCY(TILE_LATENCY), .PHW(PHW), .FG(FG), .CONSTW(CONSTW),
@@ -191,7 +220,7 @@ module zeta_engine #(
   // ---- engine FSM ----------------------------------------------------------------
   typedef enum logic [3:0] {
     FETCH, DISPATCH, WT_PAY, CEM_PAY, CEM_RUN, CRS_PAY, CZG_PAY, CZ_PREP,
-    CRS_RUN, CZ_POST, RB_HDR, RB_STREAM
+    CRS_RUN, CZ_POST, OS_PAY, OS_RUN, RB_HDR, RB_STREAM
   } state_e;
   state_e state;
 
@@ -238,8 +267,9 @@ module zeta_engine #(
   assign item_full  = asm_q | ((EWRD * 64)'(in_data) << (64 * 32'(wcnt)));
 
   assign in_ready = (state == FETCH) || (state == WT_PAY) || (state == CEM_PAY)
-                 || (state == CRS_PAY) || (state == CZG_PAY);
+                 || (state == CRS_PAY) || (state == CZG_PAY) || (state == OS_PAY);
   assign rs_feed  = (state == CRS_RUN);
+  assign os_feed  = (state == OS_RUN);
   assign out_valid = (state == RB_HDR) || (state == RB_STREAM);
 
   // readback data mux
@@ -275,6 +305,7 @@ module zeta_engine #(
       rs_start       <= 1'b0;
       zp_go          <= 1'b0;
       zsum_go        <= 1'b0;
+      os_start       <= 1'b0;
       em_entry_valid <= (state == CEM_RUN);
       em_bern_valid  <= (state == CEM_RUN);
 
@@ -325,6 +356,11 @@ module zeta_engine #(
               jcnt   <= count_f;
               wcnt   <= 8'd0;
               state  <= CZG_PAY;  // always consumes both payload words
+            end
+            OP_COMPUTE_OS: begin
+              n_q   <= count_f;  // J (grid points)
+              wcnt  <= 8'd0;
+              state <= OS_PAY;
             end
             OP_READBACK: state <= RB_HDR;
             default: begin
@@ -440,6 +476,37 @@ module zeta_engine #(
           end
         end
 
+        OS_PAY: begin
+          if (in_valid) begin
+            if (wcnt == 8'd0) begin
+              t_cur <= in_data;  // t0
+              wcnt  <= 8'd1;
+            end else if (wcnt == 8'd1) begin
+              dt_q <= in_data;
+              wcnt <= 8'd2;
+            end else begin
+              os_n_q   <= in_data[23:0];  // N
+              wcnt     <= 8'd0;
+              os_start <= 1'b1;
+              os_ctr   <= 24'd0;
+              state    <= OS_RUN;
+            end
+          end
+        end
+
+        OS_RUN: begin
+          if (os_feed && os_entry_ready) begin
+            os_ctr <= os_ctr + 24'd1;
+          end
+          if (os_pv) begin
+            res_ram[32'(rcnt)] <= {2'b00, os_sim, os_sre};
+            rcnt <= rcnt + 24'd1;
+          end
+          if (os_done_w) begin
+            state <= FETCH;
+          end
+        end
+
         CZ_POST: begin
           if (zp_done) begin
             res_ram[32'(rcnt)] <= {2'b00, ZERO_MPF, zp_z};
@@ -513,7 +580,7 @@ module zeta_engine #(
   // em_ready/rs_ready are guaranteed by the in-order engine (one eval in flight).
   // verilator lint_off UNUSEDSIGNAL
   logic unused_em_ready;
-  assign unused_em_ready = em_ready | rs_ready | zp_ready;
+  assign unused_em_ready = em_ready | rs_ready | zp_ready | os_ready;
   // verilator lint_on UNUSEDSIGNAL
 
 endmodule

@@ -23,3 +23,4 @@ rtl/common/zeta/rs_z_unit.sv
 rtl/common/mp/mpf_recip.sv
 rtl/common/zeta/rs_power_sum_tiled.sv
 rtl/common/fn/fft_radix2.sv
+rtl/common/zeta/os_grid_sum.sv

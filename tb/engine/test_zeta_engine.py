@@ -184,6 +184,8 @@ def test_zeta_engine() -> None:
             "rtl/common/zeta/rs_power_sum_tiled.sv",
             "rtl/common/fn/theta_turns.sv",
             "rtl/common/zeta/rs_z_unit.sv",
+            "rtl/common/fn/fft_radix2.sv",
+            "rtl/common/zeta/os_grid_sum.sv",
             "rtl/common/engine/zeta_engine.sv",
         ],
         "zeta_engine",
@@ -206,5 +208,7 @@ def test_zeta_engine() -> None:
             "NC": rcfg.nc,
             "KMAX": rcfg.kmax,
             "RSCK_ROM": f'"{tables / (rcfg.stem + ".mem")}"',
+            "FFT_ROM": f'"{tables / "fft_m128.mem"}"',
+            "OS_ROM": f'"{tables / "fft_os.mem"}"',
         },
     )

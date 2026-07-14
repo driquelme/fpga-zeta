@@ -53,6 +53,8 @@ def _build() -> tuple[Program, int]:
         prg.compute_z(t_fx)
     # batched grid multi-eval (COMPUTE_ZGRID): 3 points below t=100
     prg.compute_zgrid(int(98.5 * (1 << 32)), int(0.5 * (1 << 32)), 3)
+    # O-S binned-FFT grid main sum (COMPUTE_OS): 8 points at t=5000
+    prg.compute_os(int(5000.0 * (1 << 32)), int(0.25 * (1 << 32)), rs_n(int(5000.0 * (1 << 32))), 8)
     prg.readback()
     return prg, max_n
 
@@ -129,6 +131,8 @@ def test_backend_equiv(limbs: int) -> None:
             "rtl/common/zeta/rs_power_sum_tiled.sv",
             "rtl/common/fn/theta_turns.sv",
             "rtl/common/zeta/rs_z_unit.sv",
+            "rtl/common/fn/fft_radix2.sv",
+            "rtl/common/zeta/os_grid_sum.sv",
             "rtl/common/engine/zeta_engine.sv",
         ],
         "zeta_engine",
@@ -152,5 +156,7 @@ def test_backend_equiv(limbs: int) -> None:
             "NC": rcfg.nc,
             "KMAX": rcfg.kmax,
             "RSCK_ROM": f'"{tables / (rcfg.stem + ".mem")}"',
+            "FFT_ROM": f'"{tables / "fft_m128.mem"}"',
+            "OS_ROM": f'"{tables / "fft_os.mem"}"',
         },
     )

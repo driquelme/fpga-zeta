@@ -13,8 +13,9 @@ from pathlib import Path
 
 import mpmath as mp
 
-SIZES = [64, 256, 1024, 4096]
+SIZES = [64, 128, 256, 1024, 4096]
 CW = 64
+P_TERMS = 14  # combine Horner order (matches kernel/os_multieval.py)
 
 
 def generate(m: int, out_dir: Path) -> None:
@@ -33,6 +34,23 @@ def generate(m: int, out_dir: Path) -> None:
     print(f"wrote fft_m{m}: cw={CW}")
 
 
+def gen_os_consts(out_dir: Path) -> None:
+    """fft_os.mem: lines 0..14 = 1/p! at Q2.62; line 15 = 2*pi at scale 2^60.
+
+    The O-S combine (os_grid_sum) evaluates sum_p (i*u)^p/p! * G_p with
+    u = j' * 2pi / M via Horner; u is formed as (j' * twopi60) >>> (log2M-2).
+    """
+    mp.mp.prec = 128
+    mask = (1 << CW) - 1
+    lines = [
+        f"{(int(mp.nint(mp.mpf(2) ** 62 / mp.factorial(p))) & mask):016x}"
+        for p in range(P_TERMS + 1)
+    ]
+    lines.append(f"{(int(mp.nint(2 * mp.pi * mp.mpf(2) ** 60)) & mask):016x}")
+    (out_dir / "fft_os.mem").write_text("\n".join(lines) + "\n")
+    print("wrote fft_os: invfact + twopi")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out-dir", type=Path, default=Path("rtl/common/fn/tables"))
@@ -40,6 +58,7 @@ def main() -> None:
     args.out_dir.mkdir(parents=True, exist_ok=True)
     for m in SIZES:
         generate(m, args.out_dir)
+    gen_os_consts(args.out_dir)
 
 
 if __name__ == "__main__":

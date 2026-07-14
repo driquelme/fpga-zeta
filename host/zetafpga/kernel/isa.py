@@ -48,6 +48,9 @@ class Op(IntEnum):
     # M16) and N = floor(sqrt(t/2pi)) (M18) are derived on chip; the host only
     # sizes the RS table (>= floor(sqrt(t_max/2pi)) + 1 entries) and respects
     # the t >= t_min validity floor (theta_w*.json).
+    COMPUTE_OS = 10  # binned-FFT grid main sum (O-S); payload: t0, dt, n (3 words)
+    # COMPUTE_OS: J = count grid points; results = (S_re, S_im) MPF per point.
+    # Hunting-grade fixed point. Contracts: one N segment, J <= OS_M/4.
 
 
 TBL_LNN = 0
@@ -86,6 +89,10 @@ def pack_compute_z(t_fx: int) -> list[int]:
 
 def pack_compute_zgrid(t0_fx: int, dt_fx: int, count: int) -> list[int]:
     return [*descriptor(Op.COMPUTE_ZGRID, count=count), t0_fx, dt_fx]
+
+
+def pack_compute_os(t0_fx: int, dt_fx: int, n: int, count: int) -> list[int]:
+    return [*descriptor(Op.COMPUTE_OS, count=count), t0_fx, dt_fx, n]
 
 
 def _split(value: int, words: int) -> list[int]:

@@ -61,6 +61,10 @@ class Program:
         self._expected_evals += count
         return self.raw(isa.pack_compute_zgrid(t0_fx, dt_fx, count))
 
+    def compute_os(self, t0_fx: int, dt_fx: int, n: int, count: int) -> "Program":
+        self._expected_evals += count
+        return self.raw(isa.pack_compute_os(t0_fx, dt_fx, n, count))
+
     def readback(self) -> "Program":
         return self.raw(isa.descriptor(isa.Op.READBACK))
 

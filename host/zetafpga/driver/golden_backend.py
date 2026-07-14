@@ -12,15 +12,16 @@ harness and PCIe backends slot in behind the same interface in Phase 2.
 """
 
 from zetafpga.golden import mpfloat as mf
-from zetafpga.golden import rs_pipe, rs_z, zeta_em
+from zetafpga.golden import os_pipe, rs_pipe, rs_z, zeta_em
 from zetafpga.kernel import isa
 from zetafpga.kernel.em_setup import EmProgram
 from zetafpga.kernel.program import Program
 
 
 class GoldenBackend:
-    def __init__(self, fmt: mf.Format) -> None:
+    def __init__(self, fmt: mf.Format, os_m: int = 128) -> None:
         self.fmt = fmt
+        self.os_m = os_m  # must match the engine's OS_M build parameter
         self._lnn: list[tuple[int, int]] = []
         self._bern: list[mf.MPF] = []
         self._rs: list[tuple[int, mf.MPF]] = []
@@ -140,6 +141,18 @@ class GoldenBackend:
                     z = rs_z.z_post(prep, re, im, fmt)
                     self._results.append(
                         isa.EmResult(mf.pack(z, fmt), mf.pack(mf.zero(0), fmt), False, False)
+                    )
+            elif op == isa.Op.COMPUTE_OS:
+                t0_fx, dt_fx, n_os = take(1)[0], take(1)[0], take(1)[0]
+                svals = os_pipe.os_grid_sum(t0_fx, dt_fx, n_os, count, self._rs, fmt, self.os_m)
+                for re_fx, im_fx in svals:
+                    self._results.append(
+                        isa.EmResult(
+                            mf.pack(os_pipe.fx54_to_mpf(re_fx, fmt), fmt),
+                            mf.pack(os_pipe.fx54_to_mpf(im_fx, fmt), fmt),
+                            False,
+                            False,
+                        )
                     )
             elif op == isa.Op.READBACK:
                 out = [
